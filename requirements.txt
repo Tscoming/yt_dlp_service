@@ -1,4 +1,5 @@
 fastapi
 uvicorn[standard]
-yt-dlp
+yt-dlp[curl-cffi]
+yt-dlp-ejs
 requests

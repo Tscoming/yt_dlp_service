@@ -1,0 +1,10 @@
+{
+  "quiet": true,
+  "noplaylist": true,
+  "writesubtitles": true,
+  "subtitleslangs": ["en", "zh"],
+  "writethumbnail": true,
+  "subtitlesformat": "srt",
+  "format": "bestvideo[height<=?1080]+bestaudio/best",
+  "outtmpl": "~/Downloads/%(title)s.%(ext)s"
+}

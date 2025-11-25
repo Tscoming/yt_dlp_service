@@ -1,4 +1,4 @@
-import os, shutil, zipfile, uuid
+import os, shutil, zipfile, uuid, json
 from fastapi import FastAPI, BackgroundTasks
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
@@ -47,19 +47,30 @@ def cleanup_files(temp_dir: str, zip_path: str):
 def safe_get(data, key, default=None):
     """Safely get a value from a nested dictionary."""
     return data.get(key, default)
-    
+
+def load_base_ydl_opts():
+    """Loads the base yt-dlp options from the JSON config file."""
+    try:
+        with open('ydl_opts.json', 'r') as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
 def get_video_info(url: str) -> dict:
     """Extracts video information using yt-dlp."""
-    ydl_opts = {'noplaylist': True, 'quiet': True, 'listsubtitles': True}
+    ydl_opts = load_base_ydl_opts()
+    ydl_opts.update({'listsubtitles': True})
+    
     cookie_path = os.environ.get('COOKIE_FILE_PATH')
     if cookie_path and os.path.exists(cookie_path):
         ydl_opts['cookiefile'] = cookie_path
+        
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=False)
         return ydl.sanitize_info(info)
 
 @app.post("/api/v1/video/info", response_model=VideoInfo)
-async def get_info(request: URLRequest):
+def get_info(request: URLRequest):
     """Retrieves metadata for a given video URL."""
     try:
         info = get_video_info(request.url)
@@ -90,7 +101,7 @@ async def get_info(request: URLRequest):
         return JSONResponse(status_code=500, content={"error": f"An error occurred: {str(e)}"})
 
 @app.post("/api/v1/video/download")
-async def download_video(request: URLRequest, background_tasks: BackgroundTasks):
+def download_video(request: URLRequest, background_tasks: BackgroundTasks):
     """
     Downloads a video and all related files (e.g., subtitles) from the given URL,
     packages them into a zip file, and returns it.
@@ -100,7 +111,12 @@ async def download_video(request: URLRequest, background_tasks: BackgroundTasks)
     os.makedirs(temp_dir, exist_ok=True)
     zip_path = None  # Initialize zip_path
     
-    ydl_opts = {'outtmpl': f'{temp_dir}/%(title)s.%(ext)s', 'writesubtitles': True, 'allsubtitles': True, 'format': 'best'}
+    ydl_opts = load_base_ydl_opts()
+    ydl_opts.update({
+        'outtmpl': f'{temp_dir}/%(title)s.%(ext)s',
+        'allsubtitles': True
+    })
+
     cookie_path = os.environ.get('COOKIE_FILE_PATH')
     if cookie_path and os.path.exists(cookie_path):
         ydl_opts['cookiefile'] = cookie_path

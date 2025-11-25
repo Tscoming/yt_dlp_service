@@ -1,6 +1,7 @@
 version: '3.8'
 services:
   yt-dlp-service:
+    image: linux6200/yt_dlp_service:latest
     build: .
     ports:
       - "9000:8000"

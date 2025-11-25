@@ -10,6 +10,10 @@ app = FastAPI(title="YT-DLP API", description="A REST API service to download vi
 class URLRequest(BaseModel):
     url: str
 
+class DownloadRequest(BaseModel):
+    url: str
+    subtitles: Optional[List[str]] = None
+
 class VideoFormat(BaseModel):
     format_id: Optional[str] = None
     ext: Optional[str] = None
@@ -101,9 +105,9 @@ def get_info(request: URLRequest):
         return JSONResponse(status_code=500, content={"error": f"An error occurred: {str(e)}"})
 
 @app.post("/api/v1/video/download")
-def download_video(request: URLRequest, background_tasks: BackgroundTasks):
+def download_video(request: DownloadRequest, background_tasks: BackgroundTasks):
     """
-    Downloads a video and all related files (e.g., subtitles) from the given URL,
+    Downloads a video and specified subtitles from the given URL,
     packages them into a zip file, and returns it.
     """
     request_id = str(uuid.uuid4())
@@ -112,13 +116,25 @@ def download_video(request: URLRequest, background_tasks: BackgroundTasks):
     zip_path = None  # Initialize zip_path
     
     ydl_opts = load_base_ydl_opts()
-    ydl_opts.update({
-        'outtmpl': f'{temp_dir}/%(title)s.%(ext)s',
-        'allsubtitles': True
-    })
+    ydl_opts['outtmpl'] = f'{temp_dir}/%(title)s.%(ext)s'
+
+    # Handle subtitle selection
+    if request.subtitles is not None:
+        if request.subtitles:  # If the list is not empty
+            ydl_opts['subtitleslangs'] = request.subtitles
+            ydl_opts['writesubtitles'] = True
+            if 'allsubtitles' in ydl_opts:
+                del ydl_opts['allsubtitles']
+        else:  # If the list is empty, explicitly disable subtitles
+            ydl_opts['writesubtitles'] = False
+            if 'allsubtitles' in ydl_opts:
+                del ydl_opts['allsubtitles']
+    # If request.subtitles is None, the settings from ydl_opts.json are used by default.
+
+
 
     cookie_path = os.environ.get('COOKIE_FILE_PATH')
-    if cookie_path and os.path.exists(cookie_path):
+    if cookie_path and os.path.exists(cookie_path) and os.path.getsize(cookie_path) > 0:
         ydl_opts['cookiefile'] = cookie_path
 
     try:
@@ -137,6 +153,9 @@ def download_video(request: URLRequest, background_tasks: BackgroundTasks):
 
         return FileResponse(path=zip_path, media_type='application/zip', filename=zip_filename)
 
+    except yt_dlp.utils.DownloadError as e:
+        cleanup_files(temp_dir, zip_path)
+        return JSONResponse(status_code=500, content={"error": f"yt-dlp download error: {str(e)}"})
     except Exception as e:
         cleanup_files(temp_dir, zip_path)
-        return JSONResponse(status_code=500, content={"error": f"An error occurred: {str(e)}"})
+        return JSONResponse(status_code=500, content={"error": f"An unexpected error occurred: {str(e)}"})

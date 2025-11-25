@@ -1,0 +1,31 @@
+### Get Video Info - Success
+POST http://127.0.0.1:9000/api/v1/video/info
+Content-Type: application/json
+
+{
+    "url": "https://www.youtube.com/watch?v=jNQXAC9IVRw"
+}
+
+### Get Video Info - Invalid URL
+POST http://127.0.0.1:9000/api/v1/video/info
+Content-Type: application/json
+
+{
+    "url": "https://www.youtube.com/watch?v=invalidurlxyz"
+}
+
+### Download Video - Success
+POST http://127.0.0.1:9000/api/v1/video/download
+Content-Type: application/json
+
+{
+    "url": "https://www.youtube.com/watch?v=jNQXAC9IVRw"
+}
+
+### Download Video - Invalid URL
+POST http://127.0.0.1:9000/api/v1/video/download
+Content-Type: application/json
+
+{
+    "url": "https://www.youtube.com/watch?v=invalidurlxyz"
+}

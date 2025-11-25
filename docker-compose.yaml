@@ -1,0 +1,14 @@
+version: '3.8'
+services:
+  yt-dlp-service:
+    build: .
+    ports:
+      - "9000:8000"
+    volumes: 
+      - ./downloads:/app/downloads 
+      - /mnt/d/temp/youtube-download/www.youtube.com_cookies.txt:/app/cookies.txt
+      - ./ydl_opts.json:/app/ydl_opts.json
+    environment: 
+      COOKIE_FILE_PATH: /app/cookies.txt 
+      TZ: Asia/Shanghai
+    restart: unless-stopped

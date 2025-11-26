@@ -3,3 +3,6 @@ uvicorn[standard]
 yt-dlp[curl-cffi]
 yt-dlp-ejs
 requests
+bilibili-api-python
+aiohttp
+python-dotenv

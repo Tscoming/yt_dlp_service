@@ -1,6 +1,7 @@
-import os, shutil, zipfile, uuid, json
+import os, json, zipfile, uuid
+from urllib.parse import urlparse, parse_qs
 from fastapi import APIRouter, BackgroundTasks
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 import yt_dlp
@@ -43,10 +44,10 @@ class VideoInfo(BaseModel):
     subtitles: Optional[Dict[str, SubtitleInfo]] = Field({}, description="Available subtitles by language code.")
     original_url: str = Field(..., description="The original URL provided.")
     
-def cleanup_files(temp_dir: str, zip_path: str):
-    """Removes the temporary directory and the zip file."""
-    if os.path.exists(temp_dir): shutil.rmtree(temp_dir)
-    if zip_path and os.path.exists(zip_path): os.remove(zip_path)
+def cleanup_zip_file(zip_path: str):
+    """Removes the temporary zip file."""
+    if zip_path and os.path.exists(zip_path):
+        os.remove(zip_path)
 
 def safe_get(data, key, default=None):
     """Safely get a value from a nested dictionary."""
@@ -95,7 +96,7 @@ def get_info(request: URLRequest):
             uploader=safe_get(info, 'uploader'),
             upload_date=safe_get(info, 'upload_date'),
             duration=safe_get(info, 'duration'),
-            thumbnail=safe_get(info, 'thumbnail'),
+thumbnail=safe_get(info, 'thumbnail'),
             tags=safe_get(info, 'tags', []),
             view_count=safe_get(info, 'view_count'),
             like_count=safe_get(info, 'like_count'),
@@ -110,55 +111,69 @@ def get_info(request: URLRequest):
 @router.post("/download")
 def download_video(request: DownloadRequest, background_tasks: BackgroundTasks):
     """
-    Downloads a video and specified subtitles from the given URL,
-    packages them into a zip file, and returns it.
+    Downloads files, then zips and returns all non-mp4 files,
+    leaving the original files in the download directory.
     """
-    request_id = str(uuid.uuid4())
-    temp_dir = f"/tmp/{request_id}"
-    os.makedirs(temp_dir, exist_ok=True)
-    zip_path = None  # Initialize zip_path
-    
-    ydl_opts = load_base_ydl_opts()
-    ydl_opts['outtmpl'] = f'{temp_dir}/%(title)s.%(ext)s'
-
-    # Handle subtitle selection
-    if request.subtitles is not None:
-        if request.subtitles:  # If the list is not empty
-            ydl_opts['subtitleslangs'] = request.subtitles
-            ydl_opts['writesubtitles'] = True
-            if 'allsubtitles' in ydl_opts:
-                del ydl_opts['allsubtitles']
-        else:  # If the list is empty, explicitly disable subtitles
-            ydl_opts['writesubtitles'] = False
-            if 'allsubtitles' in ydl_opts:
-                del ydl_opts['allsubtitles']
-    # If request.subtitles is None, the settings from ydl_opts.json are used by default.
-
-
-
-    cookie_path = os.environ.get('COOKIE_FILE_PATH')
-    if cookie_path and os.path.exists(cookie_path) and os.path.getsize(cookie_path) > 0:
-        ydl_opts['cookiefile'] = cookie_path
-
+    zip_path = None
     try:
+        download_root = os.environ.get('VIDEO_DOWNLOAD_PATH', 'downloads')
+        parsed_url = urlparse(request.url)
+        video_id = parse_qs(parsed_url.query).get('v')
+        if not video_id:
+            video_id = parsed_url.path.lstrip('/')
+            if not video_id:
+                return JSONResponse(status_code=400, content={"error": "Could not extract video_id from URL."})
+        
+        if isinstance(video_id, list): video_id = video_id[0]
+
+        download_path = os.path.join(download_root, video_id)
+        os.makedirs(download_path, exist_ok=True)
+
+        ydl_opts = load_base_ydl_opts()
+        ydl_opts['outtmpl'] = f'{download_path}/%(title)s.%(ext)s'
+        
+        if request.subtitles is not None:
+            if request.subtitles:
+                ydl_opts['writesubtitles'] = True
+                ydl_opts['subtitleslangs'] = request.subtitles
+                if 'allsubtitles' in ydl_opts:
+                    del ydl_opts['allsubtitles']
+            else:
+                ydl_opts['writesubtitles'] = False
+                if 'allsubtitles' in ydl_opts:
+                    del ydl_opts['allsubtitles']
+
+        cookie_path = os.environ.get('COOKIE_FILE_PATH')
+        if cookie_path and os.path.exists(cookie_path) and os.path.getsize(cookie_path) > 0:
+            ydl_opts['cookiefile'] = cookie_path
+        
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(request.url, download=True)
             video_title = info.get('title', 'video')
             safe_title = "".join(c for c in video_title if c.isalnum() or c in (' ', '_')).rstrip()
-        zip_filename = f"{safe_title}.zip"
+
+        downloaded_files = os.listdir(download_path)
+        
+        zip_filename = f"{safe_title}_subtitles.zip"
         zip_path = os.path.join("/tmp", zip_filename)
+        
+        files_to_zip = [f for f in downloaded_files if not f.endswith('.mp4')]
+
+        if not files_to_zip:
+            return JSONResponse(status_code=404, content={"error": "No non-mp4 files found to zip."})
 
         with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            for root, _, files in os.walk(temp_dir):
-                for file in files: zipf.write(os.path.join(root, file), arcname=file)
-
-        background_tasks.add_task(cleanup_files, temp_dir, zip_path)
-
+            for file in files_to_zip:
+                file_path = os.path.join(download_path, file)
+                zipf.write(file_path, arcname=file)
+        
+        background_tasks.add_task(cleanup_zip_file, zip_path)
+        
         return FileResponse(path=zip_path, media_type='application/zip', filename=zip_filename)
 
     except yt_dlp.utils.DownloadError as e:
-        cleanup_files(temp_dir, zip_path)
+        if zip_path: cleanup_zip_file(zip_path)
         return JSONResponse(status_code=500, content={"error": f"yt-dlp download error: {str(e)}"})
     except Exception as e:
-        cleanup_files(temp_dir, zip_path)
+        if zip_path: cleanup_zip_file(zip_path)
         return JSONResponse(status_code=500, content={"error": f"An unexpected error occurred: {str(e)}"})

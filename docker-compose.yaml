@@ -10,6 +10,7 @@ services:
       - ./www.youtube.com_cookies.txt:/app/cookies.txt
       - ./src/youtube/ydl_opts.json:/app/src/youtube/ydl_opts.json
     environment: 
-      COOKIE_FILE_PATH: /app/cookies.txt 
+      COOKIE_FILE_PATH: /app/cookies.txt
+      VIDEO_DOWNLOAD_PATH: /app/downloads
       TZ: Asia/Shanghai
     restart: unless-stopped

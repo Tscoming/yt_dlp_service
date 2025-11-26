@@ -2,7 +2,7 @@ rm -f ./downloads/*
 python src/youtube/client.py https://www.youtube.com/watch?v=jNQXAC9IVRw ./downloads  --api_host 127.0.0.1 --api_port 9000
 
 
-
+https://www.youtube.com/watch?v=QyD0liioY8E
 
 curl -X POST \
     http://127.0.0.1:9000/api/v1/youtube/info \
@@ -34,3 +34,11 @@ curl -X POST "http://localhost:9000/api/v1/bilibili/upload" \
 
 RESPONSE:
 {"status":"success","message":"Bilibili upload finished.","aid":115614714759223,"bvid":"BV1bGUhBxEWh"}
+
+
+
+curl -X POST "http://localhost:9000/api/v1/common/upload" \
+  -H "Content-Type: multipart/form-data" \
+  -F "video_id=test_video_123" \
+  -F "fileName=my_uploaded_file.txt" \
+  -F "file=@test_upload.txt"

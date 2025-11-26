@@ -5,7 +5,7 @@ import io
 import os
 import sys
 
-def download_video_client(video_url: str, output_dir: str, subtitles: list = None, api_base_url: str = "http://127.0.0.1:9000/api/v1/video"):
+def download_video_client(video_url: str, output_dir: str, subtitles: list = None, api_base_url: str = "http://127.0.0.1:9000/api/v1/youtube"):
     """
     Calls the video download API and extracts the contents to the specified directory.
     """
@@ -95,7 +95,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     subtitle_list = args.subtitles.split(',') if args.subtitles else None
-    api_base = f"http://{args.api_host}:{args.api_port}/api/v1/video"
+    api_base = f"http://{args.api_host}:{args.api_port}/api/v1/youtube"
 
     success = download_video_client(args.video_url, args.output_dir, subtitles=subtitle_list, api_base_url=api_base)
     if success:

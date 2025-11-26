@@ -6,3 +6,4 @@ requests
 bilibili-api-python
 aiohttp
 python-dotenv
+python-multipart

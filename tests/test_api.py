@@ -7,7 +7,7 @@ class TestYtdlpApi(unittest.TestCase):
     Ensure the API service is running before executing these tests.
     """
     
-    BASE_URL = "http://127.0.0.1:9000/api/v1/video"
+    BASE_URL = "http://127.0.0.1:9000/api/v1/youtube"
     TEST_VIDEO_URL = "https://www.youtube.com/watch?v=jNQXAC9IVRw" # "Me at the zoo" - The first video on YouTube, very short.
     
     def test_01_info_endpoint_success(self):

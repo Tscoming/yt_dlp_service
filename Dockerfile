@@ -13,17 +13,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy and install Python requirements
-COPY requirements.txt .
+COPY src/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt && \
     pip install --no-cache-dir --upgrade yt-dlp
 
 # Copy the application code
-COPY service.py .
-COPY ydl_opts.json .
+COPY src/ /app/src
 
 # Expose the port the app runs on
 EXPOSE 8000
 
 # Run the application
 # Use --host 0.0.0.0 to make it accessible from outside the container
-CMD ["uvicorn", "service:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "src.api_gateway.main:app", "--host", "0.0.0.0", "--port", "8000"]

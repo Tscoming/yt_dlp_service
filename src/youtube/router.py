@@ -1,11 +1,11 @@
 import os, shutil, zipfile, uuid, json
-from fastapi import FastAPI, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 import yt_dlp
 
-app = FastAPI(title="YT-DLP API", description="A REST API service to download videos and retrieve metadata using yt-dlp.", version="1.0.0")
+router = APIRouter()
 
 class URLRequest(BaseModel):
     url: str
@@ -55,7 +55,10 @@ def safe_get(data, key, default=None):
 def load_base_ydl_opts():
     """Loads the base yt-dlp options from the JSON config file."""
     try:
-        with open('ydl_opts.json', 'r') as f:
+        # Construct the path to the JSON file relative to the current script
+        dir_path = os.path.dirname(os.path.realpath(__file__))
+        opts_path = os.path.join(dir_path, 'ydl_opts.json')
+        with open(opts_path, 'r') as f:
             return json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
         return {}
@@ -73,7 +76,7 @@ def get_video_info(url: str) -> dict:
         info = ydl.extract_info(url, download=False)
         return ydl.sanitize_info(info)
 
-@app.post("/api/v1/video/info", response_model=VideoInfo)
+@router.post("/info", response_model=VideoInfo)
 def get_info(request: URLRequest):
     """Retrieves metadata for a given video URL."""
     try:
@@ -104,7 +107,7 @@ def get_info(request: URLRequest):
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": f"An error occurred: {str(e)}"})
 
-@app.post("/api/v1/video/download")
+@router.post("/download")
 def download_video(request: DownloadRequest, background_tasks: BackgroundTasks):
     """
     Downloads a video and specified subtitles from the given URL,

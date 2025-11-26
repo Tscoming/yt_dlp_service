@@ -13,6 +13,9 @@ async def upload_video_to_bilibili(pages_data, tid, title, tags, desc, cover, no
         buvid3=config.BUVID3
     )
 
+    # 打印一下凭证信息（仅供调试，注意隐私）
+    print(f"Using Bilibili Credential: SESSDATA={credential.sessdata}, BILI_JCT={credential.bili_jct}, BUVID3={credential.buvid3}")
+
     # 构建 VideoMeta 对象
     vu_meta = video_uploader.VideoMeta(
         source=source,
@@ -55,7 +58,13 @@ async def upload_video_to_bilibili(pages_data, tid, title, tags, desc, cover, no
 
     final_response = {"status": "success", "message": "Bilibili upload finished."}
     if upload_result:
-        final_response.update(upload_result)
+        # The result from the uploader event data can be a tuple containing the dict
+        result_dict = upload_result
+        if isinstance(upload_result, tuple) and len(upload_result) > 0:
+            result_dict = upload_result[0]
+        
+        if isinstance(result_dict, dict):
+            final_response.update(result_dict)
 
     return final_response
 

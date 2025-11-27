@@ -40,24 +40,24 @@ async def _upload_subtitles(credential, video_dir: str, bvid: str):
     Finds and uploads SRT subtitles for the given BVID. It polls the video status
     to ensure it's ready before proceeding.
     """
-    print(f"Video upload complete. BVID: {bvid}. Now processing subtitles.")
+    print(f"Video upload complete. BVID: {bvid}. Now processing subtitles.", flush=True)
     
     # 1. Find .srt files
     srt_files = [f for f in os.listdir(video_dir) if f.endswith('.srt')]
     if not srt_files:
-        print("No .srt subtitle files found, skipping subtitle upload.")
+        print("No .srt subtitle files found, skipping subtitle upload.", flush=True)
         return
 
-    print(f"Found subtitle files: {srt_files}")
+    print(f"Found subtitle files: {srt_files}", flush=True)
 
     try:
         # 2. Poll for video readiness before fetching pages.
         video_obj = video.Video(bvid=bvid, credential=credential)
         is_video_ready = False
-        max_retries = 5
-        retry_delay = 15
+        max_retries = int(os.getenv("CHECK_READY_MAX_RETRIES", 5))
+        retry_delay = int(os.getenv("CHECK_READY_RETRY_DELAY", 15))
 
-        print("Polling video status to ensure it's ready for subtitle upload...")
+        print("Polling video status to ensure it's ready for subtitle upload...", flush=True)
         for i in range(max_retries):
             try:
                 info = await video_obj.get_info()
@@ -65,41 +65,41 @@ async def _upload_subtitles(credential, video_dir: str, bvid: str):
                 # Positive values (e.g., 1) mean it's visible/passed review.
                 # Negative values or 0 mean it's in review, private, deleted, etc.
                 video_state = info.get('state', 0)
-                print(f"Polling attempt {i+1}/{max_retries}: Video state is '{video_state}'. Full info: {info}")
+                print(f"Polling attempt {i+1}/{max_retries}: Video state is '{video_state}'. Full info: {info}", flush=True)
                 
                 if video_state >= 0:
-                    print("Video is ready.")
+                    print("Video is ready.", flush=True)
                     is_video_ready = True
                     break
                 else:
-                    print(f"Video not ready yet (state: {video_state}). Retrying in {retry_delay} seconds...")
+                    print(f"Video not ready yet (state: {video_state}). Retrying in {retry_delay} seconds...", flush=True)
                     await asyncio.sleep(retry_delay)
 
             except ApiException as e:
                 if e.code == -404:
-                    print(f"Polling attempt {i+1}/{max_retries}: Video not found yet (API returned 404). Retrying in {retry_delay} seconds...")
+                    print(f"Polling attempt {i+1}/{max_retries}: Video not found yet (API returned 404). Retrying in {retry_delay} seconds...", flush=True)
                     await asyncio.sleep(retry_delay)
                 else:
-                    print(f"An unexpected API error occurred while polling: {e}. Retrying in {retry_delay} seconds...")
+                    print(f"An unexpected API error occurred while polling: {e}. Retrying in {retry_delay} seconds...", flush=True)
                     await asyncio.sleep(retry_delay)
             except Exception as e:
-                print(f"An unexpected error occurred while polling: {e}. Aborting subtitle upload.")
+                print(f"An unexpected error occurred while polling: {e}. Aborting subtitle upload.", flush=True)
                 return
 
         if not is_video_ready:
-            print(f"Video did not become ready after {max_retries} attempts. Aborting subtitle upload.")
+            print(f"Video did not become ready after {max_retries} attempts. Aborting subtitle upload.", flush=True)
             return
 
         # 3. Get video pages and upload subtitles
         pages = await video_obj.get_pages()
         if not pages:
-            print("Could not retrieve video pages (CIDs), aborting subtitle upload.")
+            print("Could not retrieve video pages (CIDs), aborting subtitle upload.", flush=True)
             return
         
         first_part_cid = pages[0]['cid']
-        print(f"Targeting first video part with CID: {first_part_cid}")
+        print(f"Targeting first video part with CID: {first_part_cid}", flush=True)
         if len(pages) > 1:
-            print("Warning: Multiple video parts detected. Subtitles will be applied to the first part only.")
+            print("Warning: Multiple video parts detected. Subtitles will be applied to the first part only.", flush=True)
 
         cn_subtitle_regex = re.compile(r'zh(-CN|-TW|-HK|-SG|-MO|-Hans)?\.srt$', re.IGNORECASE)
         for srt_filename in srt_files:
@@ -111,7 +111,7 @@ async def _upload_subtitles(credential, video_dir: str, bvid: str):
                 lang = base_name.split('.')[-1]
             srt_path = os.path.join(video_dir, srt_filename)
             
-            print(f"Processing subtitle for lang '{lang}' from file '{srt_path}'...")
+            print(f"Processing subtitle for lang '{lang}' from file '{srt_path}'...", flush=True)
             
             try:
                 with open(srt_path, 'r', encoding='utf-8') as f:
@@ -119,7 +119,7 @@ async def _upload_subtitles(credential, video_dir: str, bvid: str):
                 
                 subtitle_body = parse_srt_to_bilibili_body(srt_content)
                 if not subtitle_body:
-                    print(f"Warning: Subtitle file '{srt_path}' is empty or invalid. Skipping.")
+                    print(f"Warning: Subtitle file '{srt_path}' is empty or invalid. Skipping.", flush=True)
                     continue
                 
                 subtitle_data = {
@@ -138,29 +138,29 @@ async def _upload_subtitles(credential, video_dir: str, bvid: str):
                     submit=True,
                     sign=True
                 )
-                print(f"Successfully submitted subtitle '{lang}' for CID {first_part_cid}.")
+                print(f"Successfully submitted subtitle '{lang}' for CID {first_part_cid}.", flush=True)
             except Exception as e:
-                print(f"Error submitting subtitle from file '{srt_path}': {e}")
+                print(f"Error submitting subtitle from file '{srt_path}': {e}", flush=True)
 
     except Exception as e:
-        print(f"An error occurred during subtitle processing for BVID {bvid}: {e}")
+        print(f"An error occurred during subtitle processing for BVID {bvid}: {e}", flush=True)
 
 
 async def upload(data: dict):
-    print("Starting Bilibili upload process...")
+    print("Starting Bilibili upload process...", flush=True)
     video_id = data.get("video_id")
     if not video_id:
         return {"status": "error", "message": "video_id is required"}
-    print(f"Processing video with ID: {video_id}")
+    print(f"Processing video with ID: {video_id}", flush=True)
 
     # 1. 获取文件路径
     download_path = os.getenv("VIDEO_DOWNLOAD_PATH", "downloads")
     video_dir = os.path.join(download_path, video_id)
-    print(f"Video directory set to: {video_dir}")
+    print(f"Video directory set to: {video_dir}", flush=True)
 
     if not os.path.isdir(video_dir):
         return {"status": "error", "message": f"Video directory not found: {video_dir}"}
-    print(f"Video directory '{video_dir}' found.")
+    print(f"Video directory '{video_dir}' found.", flush=True)
 
     # 2. 遍历文件，区分视频和封面
     video_files = []
@@ -175,12 +175,12 @@ async def upload(data: dict):
             video_files.append(full_path)
         elif not cover_file and ext in allowed_image_exts:
             cover_file = full_path
-    print(f"Found video files: {video_files}")
-    print(f"Found cover file: {cover_file}")
+    print(f"Found video files: {video_files}", flush=True)
+    print(f"Found cover file: {cover_file}", flush=True)
 
     if not video_files:
         return {"status": "error", "message": f"No video files found in {video_dir}"}
-    print(f"Video files to upload: {len(video_files)}")
+    print(f"Video files to upload: {len(video_files)}", flush=True)
     
     # 3. 组装上传参数
     pages_meta = data.get("pages", [])
@@ -198,7 +198,7 @@ async def upload(data: dict):
             "title": page_meta.get("title", f"Part {i+1}"),
             "description": page_meta.get("description", "")
         })
-    print(f"Prepared {len(pages_data)} pages for upload.")
+    print(f"Prepared {len(pages_data)} pages for upload.", flush=True)
 
     # 从配置中获取凭证
     credential = Credential(
@@ -208,9 +208,9 @@ async def upload(data: dict):
     )
 
     # 打印凭证信息用于调试
-    print(f"Using Bilibili Credential: SESSDATA={credential.sessdata}, BILI_JCT={credential.bili_jct}, BUVID3={credential.buvid3}")
+    print(f"Using Bilibili Credential: SESSDATA={credential.sessdata}, BILI_JCT={credential.bili_jct}, BUVID3={credential.buvid3}", flush=True)
 
-    print("Building VideoMeta object...")
+    print("Building VideoMeta object...", flush=True)
     # 构建 VideoMeta 对象
     vu_meta = video_uploader.VideoMeta(
         source=data.get("source", ""),
@@ -222,7 +222,7 @@ async def upload(data: dict):
         no_reprint=data.get("no_reprint", 1) # 默认开启禁止转载
     )
 
-    print("Creating VideoUploaderPage list...")
+    print("Creating VideoUploaderPage list...", flush=True)
     # 创建 VideoUploaderPage 列表
     pages = [
         video_uploader.VideoUploaderPage(
@@ -232,7 +232,7 @@ async def upload(data: dict):
         ) for page in pages_data
     ]
 
-    print("Initializing VideoUploader...")
+    print("Initializing VideoUploader...", flush=True)
     # 初始化上传器
     uploader = video_uploader.VideoUploader(
         pages, vu_meta, credential
@@ -244,7 +244,7 @@ async def upload(data: dict):
     @uploader.on("__ALL__")
     async def ev(event_data):
         nonlocal upload_result
-        print(f"Bilibili Upload Event: {event_data}")
+        print(f"Bilibili Upload Event: {event_data}", flush=True)
         if event_data.get("name") == "COMPLETE":
             # The result from a successful upload can be a tuple or dict
             raw_result = event_data.get("data")
@@ -254,9 +254,9 @@ async def upload(data: dict):
                 upload_result = raw_result
 
     # 开始上传
-    print("Starting Bilibili upload...")
+    print("Starting Bilibili upload...", flush=True)
     await uploader.start()
-    print("Bilibili upload finished.")
+    print("Bilibili upload finished.", flush=True)
 
     final_response = {
         "status": "success",
@@ -266,12 +266,12 @@ async def upload(data: dict):
     if upload_result and isinstance(upload_result, dict):
         final_response.update(upload_result)
         # --- SUBTITLE UPLOAD ---
-        print("Checking for BVID to initiate subtitle upload...")
+        print("Checking for BVID to initiate subtitle upload...", flush=True)
         bvid = upload_result.get("bvid")
         if bvid:
             await _upload_subtitles(credential, video_dir, bvid)
         else:
-            print("Upload complete, but no BVID received. Cannot upload subtitles.")
+            print("Upload complete, but no BVID received. Cannot upload subtitles.", flush=True)
 
     return final_response
 

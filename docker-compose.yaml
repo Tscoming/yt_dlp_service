@@ -12,5 +12,5 @@ services:
     environment: 
       COOKIE_FILE_PATH: /app/cookies.txt
       VIDEO_DOWNLOAD_PATH: /app/downloads
-      TZ: Asia/Shanghai
+      TZ: Asia/Shanghai 
     restart: unless-stopped

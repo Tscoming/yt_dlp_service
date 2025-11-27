@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Body
+from fastapi import APIRouter, HTTPException, Body, Query
 from pydantic import BaseModel
 from typing import List, Optional
 from bilibili_api import video_zone
@@ -24,19 +24,29 @@ class BilibiliUploadRequest(BaseModel):
     no_reprint: Optional[int] = 1
 
 @router.get("/zones")
-def get_zones():
+def get_zones(format: str = Query("json", description="Output format: 'json' or 'text'")):
     """
-    Retrieves a list of all Bilibili video zones, formatted as {name, tid}.
+    Retrieves a list of all Bilibili video zones.
+    If format is 'json' (default), returns a JSON array of {name, tid}.
+    If format is 'text', returns a comma-separated string of {name}({tid}).
     """
+    if format not in ["json", "text"]:
+        raise HTTPException(status_code=400, detail="Invalid format parameter. Must be 'json' or 'text'.")
+
     try:
         zone_list = video_zone.get_zone_list()
         # Transform the list to the desired format, excluding entries where tid is 0 or doesn't exist.
         formatted_zones = [
-            {"name": zone.get("name"), "tid": zone.get("tid")} 
-            for zone in zone_list 
+            {"name": zone.get("name"), "tid": zone.get("tid")}
+            for zone in zone_list
             if zone.get("tid")  # Ensures tid exists and is not 0
         ]
-        return formatted_zones
+
+        if format == "json":
+            return formatted_zones
+        elif format == "text":
+            return ", ".join([f"{zone['name']}({zone['tid']})" for zone in formatted_zones])
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred while fetching zones: {e}")
 

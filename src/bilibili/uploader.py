@@ -101,10 +101,14 @@ async def _upload_subtitles(credential, video_dir: str, bvid: str):
         if len(pages) > 1:
             print("Warning: Multiple video parts detected. Subtitles will be applied to the first part only.")
 
+        cn_subtitle_regex = re.compile(r'zh(-CN|-TW|-HK|-SG|-MO|-Hans)?\.srt$', re.IGNORECASE)
         for srt_filename in srt_files:
             # Correctly extract language code, e.g., from 'my_video.en.srt' -> 'en'
-            base_name = os.path.splitext(srt_filename)[0]
-            lang = base_name.split('.')[-1]
+            if cn_subtitle_regex.search(srt_filename):
+                lang = "zh-CN"
+            else:
+                base_name = os.path.splitext(srt_filename)[0]
+                lang = base_name.split('.')[-1]
             srt_path = os.path.join(video_dir, srt_filename)
             
             print(f"Processing subtitle for lang '{lang}' from file '{srt_path}'...")

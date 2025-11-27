@@ -102,7 +102,11 @@ async def upload(data: dict):
     await uploader.start()
     print("Bilibili upload finished.")
 
-    final_response = {"status": "success", "message": "Bilibili upload finished."}
+    final_response = {
+        "status": "success", 
+        "message": "Bilibili upload finished.",
+        "video_id": video_id
+    }
     if upload_result:
         result_dict = upload_result
         if isinstance(upload_result, tuple) and len(upload_result) > 0:

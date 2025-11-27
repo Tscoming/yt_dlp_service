@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Body
 from pydantic import BaseModel
 from typing import List, Optional
+from bilibili_api import video_zone
 
 from .uploader import upload
 from . import config
@@ -21,6 +22,23 @@ class BilibiliUploadRequest(BaseModel):
     pages: List[PageMetadata]
     source: Optional[str] = ""
     no_reprint: Optional[int] = 1
+
+@router.get("/zones")
+def get_zones():
+    """
+    Retrieves a list of all Bilibili video zones, formatted as {name, tid}.
+    """
+    try:
+        zone_list = video_zone.get_zone_list()
+        # Transform the list to the desired format, excluding entries where tid is 0 or doesn't exist.
+        formatted_zones = [
+            {"name": zone.get("name"), "tid": zone.get("tid")} 
+            for zone in zone_list 
+            if zone.get("tid")  # Ensures tid exists and is not 0
+        ]
+        return formatted_zones
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred while fetching zones: {e}")
 
 @router.post("/upload")
 async def upload_from_id(request: BilibiliUploadRequest):

@@ -65,17 +65,53 @@ class TestYtdlpApi(unittest.TestCase):
         self.assertEqual(response_download.status_code, 500)
         print("Test for invalid URL handling PASSED.")
 
+class TestBilibiliApi(unittest.TestCase):
+    """Test suite for the Bilibili API endpoints."""
+    
+    BASE_URL = "http://127.0.0.1:9000/api/v1/bilibili"
+
+    def test_get_zones_success(self):
+        """Tests the /zones endpoint."""
+        print("\n--- Testing /zones endpoint ---")
+        response = requests.get(f"{self.BASE_URL}/zones")
+        
+        print(f"Status Code: {response.status_code}")
+        self.assertEqual(response.status_code, 200)
+        
+        data = response.json()
+        self.assertTrue(isinstance(data, list))
+        self.assertGreater(len(data), 0)
+        
+        # Check for expected keys in the first zone object
+        first_zone = data[0]
+        self.assertIn("tid", first_zone)
+        self.assertIn("reid", first_zone)
+        self.assertIn("name", first_zone)
+        self.assertIn("parent_reid", first_zone) # Not in all, but good to check
+        
+        print("Test for /zones endpoint PASSED.")
+
 if __name__ == "__main__":
     print("Starting API tests...")
-    print(f"Targeting API at: {TestYtdlpApi.BASE_URL}")
+    print(f"Targeting YouTube API at: {TestYtdlpApi.BASE_URL}")
+    print(f"Targeting Bilibili API at: {TestBilibiliApi.BASE_URL}")
     print(f"Using test video: {TestYtdlpApi.TEST_VIDEO_URL}")
     print("==========================================")
     
-    try: # First, check if the server is running
-        requests.get(TestYtdlpApi.BASE_URL.rsplit('/api', 1)[0] + "/docs")
+    try:
+        # Check if the server is running by accessing the docs
+        server_root_url = TestYtdlpApi.BASE_URL.rsplit('/api', 1)[0]
+        requests.get(server_root_url + "/docs", timeout=5)
     except requests.ConnectionError:
         print("\nERROR: API server is not running or not accessible at the specified URL.")
         print("Please start the server before running tests.")
         exit(1)
         
-    unittest.main()
+    # Create a TestSuite and add tests from both classes
+    suite = unittest.TestSuite()
+    suite.addTest(unittest.makeSuite(TestYtdlpApi))
+    suite.addTest(unittest.makeSuite(TestBilibiliApi))
+    
+    # Run the test suite
+    runner = unittest.TextTestRunner()
+    runner.run(suite)

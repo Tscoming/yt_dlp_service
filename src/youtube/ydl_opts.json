@@ -2,7 +2,7 @@
   "quiet": true,
   "noplaylist": true,
   "writesubtitles": true,
-  "writeautomaticsub": true,
+  "writeautomaticsub": false,
   "writethumbnail": true,
   "subtitleslangs": ["en", "zh-Hans"],
   "subtitlesformat": "srt",

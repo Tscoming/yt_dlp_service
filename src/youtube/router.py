@@ -108,6 +108,34 @@ thumbnail=safe_get(info, 'thumbnail'),
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": f"An error occurred: {str(e)}"})
 
+class MyLogger:
+    def debug(self, msg):
+        # For compatibility with yt-dlp, we filter out some messages
+        if msg.startswith('[debug] '):
+            pass
+        else:
+            self.info(msg)
+
+    def info(self, msg):
+        print(msg, flush=True)
+
+    def warning(self, msg):
+        print(f"WARNING: {msg}", flush=True)
+
+    def error(self, msg):
+        print(f"ERROR: {msg}", flush=True)
+
+def my_progress_hook(d):
+    if d['status'] == 'downloading':
+        total_bytes = d.get('total_bytes') or d.get('total_bytes_estimate')
+        if total_bytes:
+            percentage = d['downloaded_bytes'] / total_bytes * 100
+            print(f"Downloading: {d['filename']} - {percentage:.2f}% of {total_bytes / 1024 / 1024:.2f}MB at {d.get('speed', 'N/A')}B/s, ETA: {d.get('eta', 'N/A')}s", flush=True)
+    elif d['status'] == 'finished':
+        print(f"Finished downloading {d['filename']}", flush=True)
+    elif d['status'] == 'error':
+        print(f"Error downloading {d['filename']}", flush=True)
+
 @router.post("/download")
 def download_video(request: DownloadRequest, background_tasks: BackgroundTasks):
     """
@@ -116,43 +144,54 @@ def download_video(request: DownloadRequest, background_tasks: BackgroundTasks):
     """
     zip_path = None
     try:
+        print(f"Starting download for URL: {request.url}", flush=True)
         download_root = os.environ.get('VIDEO_DOWNLOAD_PATH', 'downloads')
         parsed_url = urlparse(request.url)
         video_id = parse_qs(parsed_url.query).get('v')
         if not video_id:
             video_id = parsed_url.path.lstrip('/')
             if not video_id:
+                print("Could not extract video_id from URL.", flush=True)
                 return JSONResponse(status_code=400, content={"error": "Could not extract video_id from URL."})
         
         if isinstance(video_id, list): video_id = video_id[0]
 
         download_path = os.path.join(download_root, video_id)
         os.makedirs(download_path, exist_ok=True)
+        print(f"Download path set to: {download_path}", flush=True)
 
         ydl_opts = load_base_ydl_opts()
         ydl_opts['outtmpl'] = f'{download_path}/%(title)s.%(ext)s'
+        ydl_opts['logger'] = MyLogger()
+        ydl_opts['progress_hooks'] = [my_progress_hook]
         
         if request.subtitles is not None:
             if request.subtitles:
+                print(f"Subtitles requested for languages: {request.subtitles}", flush=True)
                 ydl_opts['writesubtitles'] = True
                 ydl_opts['subtitleslangs'] = request.subtitles
                 if 'allsubtitles' in ydl_opts:
                     del ydl_opts['allsubtitles']
             else:
+                print("No subtitles requested.", flush=True)
                 ydl_opts['writesubtitles'] = False
                 if 'allsubtitles' in ydl_opts:
                     del ydl_opts['allsubtitles']
 
         cookie_path = os.environ.get('COOKIE_FILE_PATH')
         if cookie_path and os.path.exists(cookie_path) and os.path.getsize(cookie_path) > 0:
+            print("Using cookies from file.", flush=True)
             ydl_opts['cookiefile'] = cookie_path
         
+        print("Starting yt-dlp download...", flush=True)
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(request.url, download=True)
             video_title = info.get('title', 'video')
             safe_title = "".join(c for c in video_title if c.isalnum() or c in (' ', '_')).rstrip()
+        print("yt-dlp download finished.", flush=True)
 
         downloaded_files = os.listdir(download_path)
+        print(f"Downloaded files: {downloaded_files}", flush=True)
         
         zip_filename = f"{safe_title}_subtitles.zip"
         zip_path = os.path.join("/tmp", zip_filename)
@@ -160,12 +199,15 @@ def download_video(request: DownloadRequest, background_tasks: BackgroundTasks):
         files_to_zip = [f for f in downloaded_files if not f.endswith('.mp4')]
 
         if not files_to_zip:
+            print("No non-mp4 files found to zip.", flush=True)
             return JSONResponse(status_code=404, content={"error": "No non-mp4 files found to zip."})
 
+        print(f"Zipping files: {files_to_zip}", flush=True)
         with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
             for file in files_to_zip:
                 file_path = os.path.join(download_path, file)
                 zipf.write(file_path, arcname=file)
+        print(f"Zip file created at: {zip_path}", flush=True)
         
         background_tasks.add_task(cleanup_zip_file, zip_path)
         

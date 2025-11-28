@@ -208,3 +208,6 @@ __marimo__/
 
  
 www.youtube.com_cookies.txt
+
+# Bilibili credentials
+src/bilibili/bilibili_credentials.json

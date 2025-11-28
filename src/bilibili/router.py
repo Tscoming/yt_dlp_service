@@ -2,9 +2,10 @@ from fastapi import APIRouter, HTTPException, Body, Query
 from pydantic import BaseModel
 from typing import List, Optional
 from bilibili_api import video_zone
+import asyncio
 
 from .uploader import upload
-from . import config
+from . import auth
 
 router = APIRouter()
 
@@ -50,6 +51,31 @@ def get_zones(format: str = Query("json", description="Output format: 'json' or 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred while fetching zones: {e}")
 
+
+@router.post("/login")
+async def login():
+    """
+    Initiates the Bilibili QR code login process.
+    The QR code will be displayed in the console where the service is running.
+    This process runs in the background.
+    """
+    print("Received request to start Bilibili login process...")
+    # Run the login process in the background so it doesn't block the API
+    asyncio.create_task(auth.login_and_save_credential())
+    return {"message": "Bilibili login process started. Please check the server console to scan the QR code."}
+
+@router.post("/refresh")
+async def refresh():
+    """
+    Attempts to refresh the Bilibili credentials using the stored refresh token.
+    """
+    print("Received request to refresh Bilibili credential...")
+    credential = await auth.refresh_credential()
+    if credential:
+        return {"status": "success", "message": "Credential refreshed successfully."}
+    else:
+        raise HTTPException(status_code=400, detail="Failed to refresh credential. A new login may be required.")
+
 @router.post("/upload")
 async def upload_from_id(request: BilibiliUploadRequest):
     """
@@ -59,9 +85,6 @@ async def upload_from_id(request: BilibiliUploadRequest):
     The video and cover files are expected to be present in the directory
     `{VIDEO_DOWNLOAD_PATH}/{video_id}`.
     """
-    if not all([config.SESSDATA, config.BILI_JCT]):
-        raise HTTPException(status_code=500, detail="Bilibili SESSDATA and BILI_JCT credentials must be configured on the server.")
-
     try:
         # The uploader function now expects a dictionary.
         result = await upload(request.dict())

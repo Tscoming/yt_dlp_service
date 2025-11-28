@@ -1,3 +1,6 @@
+
+curl -X POST http://localhost:9000/api/v1/bilibili/login
+
 rm -f ./downloads/*
 python src/youtube/client.py https://www.youtube.com/watch?v=jNQXAC9IVRw ./downloads  --api_host 127.0.0.1 --api_port 9000
 
@@ -22,18 +25,14 @@ curl -X POST \
     -H 'Content-Type: application/json' \
     -d '{
   "video_id":  "jNQXAC9IVRw",
-  "tid": 17,
-  "title": "鹰狮战斗机 - 随时保持战斗准备状态- subtest",
-  "tags": [
-    "生活",
-    "Vlog",
-    "动物园"
-  ],
-  "desc": "作战效果的关键在于在需要时让战斗机升空。这就是为什么鹰狮战斗机的设计确保了持续的最大可用性。当没有跑道可用时，鹰狮战斗机部队可以从小型机场甚至高速公路上运作。例如，鹰狮战斗机可以在仅16×800米的公路跑道上运作。在本片中，您将了解更多关于鹰狮战斗机始终保持战斗准备状态的原因。",
+  "tid": 232,
+  "title": "上传测试",
+  "tags": ["测试", "上传", "脚本"],
+  "desc": "这是上传测试视频",
   "pages": [
     {
-      "title": "我的第一个B站视频 - Part 1",
-      "description": "这是我上传的第一个B站视频片段描述。"
+      "title": "上传测试 - 第1页",
+      "description": "这是上传测试视频的第一页。"
     }
   ]
 }'

@@ -3,7 +3,7 @@ import os
 import re
 from bilibili_api import video, video_uploader, Credential
 from bilibili_api.exceptions import ApiException
-from . import config
+from . import auth
 
 def srt_time_to_seconds(time_str: str) -> float:
     """Converts SRT time format HH:MM:SS,ms to seconds."""
@@ -200,12 +200,13 @@ async def upload(data: dict):
         })
     print(f"Prepared {len(pages_data)} pages for upload.", flush=True)
 
-    # 从配置中获取凭证
-    credential = Credential(
-        sessdata=config.SESSDATA,
-        bili_jct=config.BILI_JCT,
-        buvid3=config.BUVID3
-    )
+    try:
+        print("Attempting to get Bilibili credential...", flush=True)
+        credential = await auth.get_credential()
+        print("Successfully got Bilibili credential.", flush=True)
+    except Exception as e:
+        print(f"Failed to get Bilibili credential: {e}", flush=True)
+        return {"status": "error", "message": f"Failed to get Bilibili credential: {e}"}
 
     # 打印凭证信息用于调试
     print(f"Using Bilibili Credential: SESSDATA={credential.sessdata}, BILI_JCT={credential.bili_jct}, BUVID3={credential.buvid3}", flush=True)
@@ -245,6 +246,10 @@ async def upload(data: dict):
     async def ev(event_data):
         nonlocal upload_result
         print(f"Bilibili Upload Event: {event_data}", flush=True)
+        if event_data.get("name") == "PREUPLOAD_FAILED":
+            print(f"PREUPLOAD_FAILED data: {event_data.get('data')}", flush=True)
+        if event_data.get("name") == "FAILED":
+            print(f"FAILED data: {event_data.get('data')}", flush=True)
         if event_data.get("name") == "COMPLETE":
             # The result from a successful upload can be a tuple or dict
             raw_result = event_data.get("data")

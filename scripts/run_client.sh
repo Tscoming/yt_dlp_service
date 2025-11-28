@@ -1,6 +1,11 @@
 
 curl -X POST http://localhost:9000/api/v1/bilibili/login
 
+# 测试上传bilibili视频完成后的webhook回调
+curl -X POST https://n8n.homelabtech.cn/webhook-test/b2d8a919-323e-46ea-9d39-80c1d75ca680 \
+  -H "Content-Type: application/json" \
+  -d '{"msg": "hello n8n 1"}'
+
 rm -f ./downloads/*
 python src/youtube/client.py https://www.youtube.com/watch?v=jNQXAC9IVRw ./downloads  --api_host 127.0.0.1 --api_port 9000
 

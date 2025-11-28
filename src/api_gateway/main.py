@@ -1,3 +1,6 @@
+from dotenv import load_dotenv
+load_dotenv()
+
 from fastapi import FastAPI
 from src.youtube.router import router as youtube_router
 from src.bilibili.router import router as bilibili_router

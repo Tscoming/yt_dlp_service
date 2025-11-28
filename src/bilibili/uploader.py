@@ -38,7 +38,10 @@ def parse_srt_to_bilibili_body(srt_content: str) -> list:
 
 async def _call_webhook(data: dict):
     """Calls the n8n webhook with the provided data."""
+    
     webhook_url = os.getenv("N8N_WEBHOOK_URL", "https://n8n.homelabtech.cn/webhook-test/b2d8a919-323e-46ea-9d39-80c1d75ca680")
+    print(f"Calling webhook url: {webhook_url}", flush=True)
+    print(f"Calling webhook with data: {data}", flush=True)
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(webhook_url, json=data, timeout=30.0)

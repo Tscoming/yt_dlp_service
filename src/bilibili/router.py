@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Body, Query
+from fastapi import APIRouter, HTTPException, Body, Query, BackgroundTasks
 from pydantic import BaseModel
 from typing import List, Optional
 from bilibili_api import video_zone
@@ -77,24 +77,25 @@ async def refresh():
         raise HTTPException(status_code=400, detail="Failed to refresh credential. A new login may be required.")
 
 @router.post("/upload")
-async def upload_from_id(request: BilibiliUploadRequest):
+async def upload_from_id(request: BilibiliUploadRequest, background_tasks: BackgroundTasks):
     """
     Receives metadata including a `video_id`, finds the corresponding
     downloaded files, and uploads them to Bilibili.
 
     The video and cover files are expected to be present in the directory
     `{VIDEO_DOWNLOAD_PATH}/{video_id}`.
+    
+    This endpoint returns immediately and the upload is processed in the background.
     """
     try:
-        # The uploader function now expects a dictionary.
-        result = await upload(request.dict())
+        # Add the upload task to run in the background
+        background_tasks.add_task(upload, request.dict())
         
-        if result.get("status") == "error":
-            # Pass through errors from the uploader as HTTPExceptions
-            raise HTTPException(status_code=400, detail=result.get("message", "Unknown error during upload."))
-            
-        return result
+        return {
+            "message": "Upload task accepted and is running in the background.",
+            "video_id": request.video_id
+        }
     except Exception as e:
-        # Catch any other unexpected errors
-        raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
+        # Catch any unexpected errors during task submission
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred while queueing the upload task: {e}")
 

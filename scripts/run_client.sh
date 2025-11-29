@@ -24,6 +24,35 @@ curl -X POST \
     -d '{ "url": "https://www.youtube.com/watch?v=jNQXAC9IVRw" }' -o file.zip
  
 
+
+
+# class VideoMeta:
+#     """
+#     视频源数据
+#     """
+
+#     tid: int  # 分区 ID。可以使用 channel 模块进行查询。
+#     title: str  # 视频标题
+#     desc: str  # 视频简介。
+#     cover: Picture  # 封面 URL
+#     tags: Union[List[str], str]  # 视频标签。使用英文半角逗号分隔的标签组。
+#     topic_id: Optional[int] = None  # 可选，话题 ID。
+#     mission_id: Optional[int] = None  # 可选，任务 ID。
+#     original: bool = True  # 可选，是否为原创视频。
+#     source: Optional[str] = None  # 可选，视频来源。
+#     recreate: Optional[bool] = False  # 可选，是否允许重新上传。
+#     no_reprint: Optional[bool] = False  # 可选，是否禁止转载。
+#     open_elec: Optional[bool] = False  # 可选，是否展示充电信息。
+#     up_selection_reply: Optional[bool] = False  # 可选，是否开启评论精选。
+#     up_close_danmu: Optional[bool] = False  # 可选，是否关闭弹幕。
+#     up_close_reply: Optional[bool] = False  # 可选，是否关闭评论。
+#     lossless_music: Optional[bool] = False  # 可选，是否启用无损音乐。
+#     dolby: Optional[bool] = False  # 可选，是否启用杜比音效。
+#     subtitle: Optional[dict] = None  # 可选，字幕设置。
+#     dynamic: Optional[str] = None  # 可选，动态信息。
+#     neutral_mark: Optional[str] = None  # 可选，创作者声明。
+#     delay_time: Optional[Union[int, datetime]] = None  # 可选，定时发布时间戳（秒）。
+#     porder: Optional[VideoPorderMeta] = None  # 可选，商业相关参数。
 # Example for Bilibili upload (new JSON-based API)
 curl -X POST \
     http://localhost:9000/api/v1/bilibili/upload \
@@ -34,6 +63,8 @@ curl -X POST \
   "title": "上传测试",
   "tags": ["测试", "上传", "脚本"],
   "desc": "这是上传测试视频",
+  "original": false,
+  "source": "TestSource",
   "pages": [
     {
       "title": "上传测试 - 第1页",

@@ -9,8 +9,10 @@ services:
       - ./downloads:/app/downloads 
       - ./www.youtube.com_cookies.txt:/app/cookies.txt
       - ./src/youtube/ydl_opts.json:/app/src/youtube/ydl_opts.json
+      - ./bilibili_credentials.json:/app/bilibili_credentials.json
     environment: 
       COOKIE_FILE_PATH: /app/cookies.txt
       VIDEO_DOWNLOAD_PATH: /app/downloads
+      BILIBILI_CREDENTIALS_FILE: /app/bilibili_credentials.json
       TZ: Asia/Shanghai 
     restart: unless-stopped

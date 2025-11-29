@@ -7,7 +7,11 @@ from bilibili_api.login_v2 import QrCodeLogin
 from bilibili_api.exceptions import ApiException
 
 # Define the path for storing credentials
-CRED_FILE_PATH = Path(__file__).parent / "bilibili_credentials.json"
+cred_file_env = os.getenv("BILIBILI_CREDENTIALS_FILE")
+if cred_file_env:
+    CRED_FILE_PATH = Path(cred_file_env)
+else:
+    CRED_FILE_PATH = Path(__file__).parent / "bilibili_credentials.json"
 
 async def save_credential(credential: Credential, ac_time_value: str = None):
     """Saves the credential object and ac_time_value to a JSON file."""
@@ -82,12 +86,12 @@ async def login_and_save_credential() -> Credential | None:
             await asyncio.sleep(1) # Poll every second
 
         credential = qr_login.get_credential()
-        print("Login successful!")
+        print("Login successful!", flush=True)
         refresh_token = getattr(credential, 'ac_time_value', None)
         await save_credential(credential, refresh_token)
         return credential
     except ApiException as e:
-        print(f"Login failed: {e}")
+        print(f"Login failed: {e}", flush=True)
         return None
 
 async def get_credential() -> Credential:
@@ -102,19 +106,19 @@ async def get_credential() -> Credential:
         try:
             # is_valid() is a synchronous check, but let's be safe
             if await credential.check_valid():
-                print("Loaded credential is valid.")
+                print("Loaded credential is valid.", flush=True)
                 return credential
             else:
-                print("Credential expired, attempting to refresh.")
-                refreshed_credential = await refresh_credential(credential, ac_time_value)
+                print("Credential expired, attempting to refresh.", flush=True)
+                refreshed_credential = await refresh_credential(credential, refresh_token)
                 if refreshed_credential:
                     return refreshed_credential
         except ApiException as e:
-            print(f"Error checking credential validity, attempting refresh: {e}")
-            refreshed_credential = await refresh_credential(credential, ac_time_value)
+            print(f"Error checking credential validity, attempting refresh: {e}", flush=True)
+            refreshed_credential = await refresh_credential(credential, refresh_token)
             if refreshed_credential:
                 return refreshed_credential
 
     # If no valid credential could be loaded or refreshed
-    print("No valid credential available.")
+    print("No valid credential available.", flush=True)
     raise Exception("No valid Bilibili credential. Please trigger a login via the API.")

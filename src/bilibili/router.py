@@ -31,6 +31,7 @@ def get_zones(format: str = Query("json", description="Output format: 'json' or 
     If format is 'json' (default), returns a JSON array of {name, tid}.
     If format is 'text', returns a comma-separated string of {name}({tid}).
     """
+    print(f"\n========== STARTING GET_ZONES with format: {format} ==========\n", flush=True)
     if format not in ["json", "text"]:
         raise HTTPException(status_code=400, detail="Invalid format parameter. Must be 'json' or 'text'.")
 
@@ -44,11 +45,14 @@ def get_zones(format: str = Query("json", description="Output format: 'json' or 
         ]
 
         if format == "json":
+            print(f"\n========== GET_ZONES COMPLETED SUCCESSFULLY for format: {format} ==========\n", flush=True)
             return formatted_zones
         elif format == "text":
+            print(f"\n========== GET_ZONES COMPLETED SUCCESSFULLY for format: {format} ==========\n", flush=True)
             return ", ".join([f"{zone['name']}({zone['tid']})" for zone in formatted_zones])
 
     except Exception as e:
+        print(f"\n========== GET_ZONES FAILED with error: {e} ==========\n", flush=True)
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred while fetching zones: {e}")
 
 
@@ -59,9 +63,11 @@ async def login():
     The QR code will be displayed in the console where the service is running.
     This process runs in the background.
     """
+    print("\n========== STARTING BILIBILI LOGIN ==========\n", flush=True)
     print("Received request to start Bilibili login process...")
     # Run the login process in the background so it doesn't block the API
     asyncio.create_task(auth.login_and_save_credential())
+    print("\n========== BILIBILI LOGIN PROCESS STARTED ==========\n", flush=True)
     return {"message": "Bilibili login process started. Please check the server console to scan the QR code."}
 
 @router.post("/refresh")
@@ -69,11 +75,14 @@ async def refresh():
     """
     Attempts to refresh the Bilibili credentials using the stored refresh token.
     """
+    print("\n========== STARTING BILIBILI REFRESH ==========\n", flush=True)
     print("Received request to refresh Bilibili credential...")
     credential = await auth.refresh_credential()
     if credential:
+        print("\n========== BILIBILI REFRESH COMPLETED SUCCESSFULLY ==========\n", flush=True)
         return {"status": "success", "message": "Credential refreshed successfully."}
     else:
+        print("\n========== BILIBILI REFRESH FAILED ==========\n", flush=True)
         raise HTTPException(status_code=400, detail="Failed to refresh credential. A new login may be required.")
 
 @router.post("/upload")
@@ -87,15 +96,18 @@ async def upload_from_id(request: BilibiliUploadRequest, background_tasks: Backg
     
     This endpoint returns immediately and the upload is processed in the background.
     """
+    print(f"\n========== STARTING BILIBILI UPLOAD for video_id: {request.video_id} ==========\n", flush=True)
     try:
         # Add the upload task to run in the background
         background_tasks.add_task(upload, request.dict())
         
+        print(f"\n========== BILIBILI UPLOAD TASK ACCEPTED for video_id: {request.video_id} ==========\n", flush=True)
         return {
             "message": "Upload task accepted and is running in the background.",
             "video_id": request.video_id
         }
     except Exception as e:
         # Catch any unexpected errors during task submission
+        print(f"\n========== BILIBILI UPLOAD FAILED for video_id: {request.video_id} with error: {e} ==========\n", flush=True)
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred while queueing the upload task: {e}")
 

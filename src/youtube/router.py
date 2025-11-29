@@ -67,7 +67,6 @@ def load_base_ydl_opts():
 def get_video_info(url: str) -> dict:
     """Extracts video information using yt-dlp."""
     ydl_opts = load_base_ydl_opts()
-    ydl_opts.update({'listsubtitles': True})
     
     cookie_path = os.environ.get('COOKIE_FILE_PATH')
     if cookie_path and os.path.exists(cookie_path):
@@ -80,6 +79,7 @@ def get_video_info(url: str) -> dict:
 @router.post("/info", response_model=VideoInfo)
 def get_info(request: URLRequest):
     """Retrieves metadata for a given video URL."""
+    print(f"\n========== STARTING GET_INFO for URL: {request.url} ==========\n", flush=True)
     try:
         info = get_video_info(request.url)
         subtitles_info = {}
@@ -104,8 +104,10 @@ thumbnail=safe_get(info, 'thumbnail'),
             subtitles=subtitles_info,
             original_url=safe_get(info, 'webpage_url', request.url)
         )
+        print(f"\n========== GET_INFO COMPLETED SUCCESSFULLY for URL: {request.url} ==========\n", flush=True)
         return standardized_info
     except Exception as e:
+        print(f"\n========== GET_INFO FAILED for URL: {request.url} with error: {e} ==========\n", flush=True)
         return JSONResponse(status_code=500, content={"error": f"An error occurred: {str(e)}"})
 
 class MyLogger:
@@ -117,7 +119,10 @@ class MyLogger:
             self.info(msg)
 
     def info(self, msg):
-        print(msg, flush=True)
+        if "Language Name" in msg: # Filter out subtitle listing header
+            pass
+        elif not msg.startswith('[download]'):
+            print(msg, flush=True)
 
     def warning(self, msg):
         print(f"WARNING: {msg}", flush=True)
@@ -125,16 +130,57 @@ class MyLogger:
     def error(self, msg):
         print(f"ERROR: {msg}", flush=True)
 
-def my_progress_hook(d):
-    if d['status'] == 'downloading':
-        total_bytes = d.get('total_bytes') or d.get('total_bytes_estimate')
-        if total_bytes:
-            percentage = d['downloaded_bytes'] / total_bytes * 100
-            print(f"Downloading: {d['filename']} - {percentage:.2f}% of {total_bytes / 1024 / 1024:.2f}MB at {d.get('speed', 'N/A')}B/s, ETA: {d.get('eta', 'N/A')}s", flush=True)
-    elif d['status'] == 'finished':
-        print(f"Finished downloading {d['filename']}", flush=True)
-    elif d['status'] == 'error':
-        print(f"Error downloading {d['filename']}", flush=True)
+class ProgressLogger:
+    def __init__(self):
+        self.last_reported_milestone = {}
+
+    def hook(self, d):
+        if d['status'] == 'downloading':
+            filename = d.get('filename')
+            if not filename:
+                return
+
+            percentage = None
+            if 'fragment_index' in d and 'fragment_count' in d:
+                # Progress based on fragments for HLS downloads
+                if d['fragment_count'] > 0:
+                    percentage = (d['fragment_index'] / d['fragment_count']) * 100
+            else:
+                # Progress based on bytes for other downloads
+                total_bytes = d.get('total_bytes') or d.get('total_bytes_estimate')
+                if total_bytes and total_bytes > 0:
+                    percentage = (d['downloaded_bytes'] / total_bytes) * 100
+            
+            if percentage is None:
+                return
+
+            milestone = int(percentage / 25) * 25
+            
+            last_milestone = self.last_reported_milestone.get(filename, -1)
+
+            if milestone > last_milestone:
+                print(f"Downloading: {filename} - {milestone}% ...", flush=True)
+                self.last_reported_milestone[filename] = milestone
+
+        elif d['status'] == 'finished':
+            filename = d.get('filename')
+            if not filename:
+                print("Finished downloading a file.", flush=True)
+                return
+
+            last_milestone = self.last_reported_milestone.get(filename, -1)
+            if last_milestone < 100:
+                print(f"Downloading: {filename} - 100% ...", flush=True)
+            
+            print(f"Finished downloading {filename}", flush=True)
+            if filename in self.last_reported_milestone:
+                del self.last_reported_milestone[filename]
+        
+        elif d['status'] == 'error':
+            filename = d.get('filename')
+            print(f"Error downloading {filename}", flush=True)
+            if filename and filename in self.last_reported_milestone:
+                del self.last_reported_milestone[filename]
 
 @router.post("/download")
 def download_video(request: DownloadRequest, background_tasks: BackgroundTasks):
@@ -142,6 +188,7 @@ def download_video(request: DownloadRequest, background_tasks: BackgroundTasks):
     Downloads files, then zips and returns all non-mp4 files,
     leaving the original files in the download directory.
     """
+    print("\n========== STARTING API DOWNLOAD ==========\n", flush=True)
     zip_path = None
     try:
         print(f"Starting download for URL: {request.url}", flush=True)
@@ -163,7 +210,8 @@ def download_video(request: DownloadRequest, background_tasks: BackgroundTasks):
         ydl_opts = load_base_ydl_opts()
         ydl_opts['outtmpl'] = f'{download_path}/%(title)s.%(ext)s'
         ydl_opts['logger'] = MyLogger()
-        ydl_opts['progress_hooks'] = [my_progress_hook]
+        progress_logger = ProgressLogger()
+        ydl_opts['progress_hooks'] = [progress_logger.hook]
         
         if request.subtitles is not None:
             if request.subtitles:
@@ -211,11 +259,14 @@ def download_video(request: DownloadRequest, background_tasks: BackgroundTasks):
         
         background_tasks.add_task(cleanup_zip_file, zip_path)
         
+        print(f"\n========== API DOWNLOAD COMPLETED SUCCESSFULLY for URL: {request.url} ==========\n", flush=True)
         return FileResponse(path=zip_path, media_type='application/zip', filename=zip_filename)
 
     except yt_dlp.utils.DownloadError as e:
+        print(f"\n========== API DOWNLOAD FAILED for URL: {request.url} with error: {e} ==========\n", flush=True)
         if zip_path: cleanup_zip_file(zip_path)
         return JSONResponse(status_code=500, content={"error": f"yt-dlp download error: {str(e)}"})
     except Exception as e:
+        print(f"\n========== API DOWNLOAD FAILED for URL: {request.url} with unexpected error: {e} ==========\n", flush=True)
         if zip_path: cleanup_zip_file(zip_path)
         return JSONResponse(status_code=500, content={"error": f"An unexpected error occurred: {str(e)}"})

@@ -116,6 +116,7 @@ async def upload_from_id(
     Step 3: Subtitle uploading and other post-processing tasks are run asynchronously in the background.
     """
     video_id = payload.video_id
+    title = payload.title
     data = payload.dict()
 
     chat_id = request.headers.get("chat_id", 0 )
@@ -145,6 +146,7 @@ async def upload_from_id(
             final_response = {"status": "success", 
                               "message": "Bilibili video upload finished. Begin finds and uploads SRT subtitles... ...", 
                               "video_id": video_id,
+                              "title": title,
                               "chat_id": chat_id
                               }
             final_response.update(upload_result)

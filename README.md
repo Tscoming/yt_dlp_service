@@ -36,6 +36,10 @@
     ```bash
     uvicorn src.api_gateway.main:app --host 0.0.0.0 --port 9000 --reload
     ```
+    容器化开发环境启动方式
+    ```
+    docker compose -f docker-compose.yaml -f docker-compose.dev.yaml up --build
+    ```
 
 ## API 用法
 

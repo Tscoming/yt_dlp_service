@@ -4,6 +4,7 @@ from typing import List, Optional
 from bilibili_api import video_zone
 import asyncio
 import os
+from fastapi import Request
 
 from .uploader import upload_video, upload_subtitles, call_webhook
 from . import auth
@@ -101,7 +102,11 @@ async def refresh():
         raise HTTPException(status_code=400, detail="Failed to refresh credential. A new login may be required.")
 
 @router.post("/upload")
-async def upload_from_id(request: BilibiliUploadRequest, background_tasks: BackgroundTasks):
+async def upload_from_id(
+    request: Request, 
+    payload: BilibiliUploadRequest,
+    background_tasks: BackgroundTasks
+):
     """
     Receives metadata including a `video_id`, finds the corresponding
     downloaded files, and uploads them to Bilibili.
@@ -110,8 +115,11 @@ async def upload_from_id(request: BilibiliUploadRequest, background_tasks: Backg
     Step 2: If video upload is successful, the API returns a response.
     Step 3: Subtitle uploading and other post-processing tasks are run asynchronously in the background.
     """
-    video_id = request.video_id
-    data = request.dict()
+    video_id = payload.video_id
+    data = payload.dict()
+
+    chat_id = request.headers.get("chat_id", 0 )
+    
     print(f"\n========== STARTING BILIBILI UPLOAD for video_id: {video_id} ==========\n", flush=True)
 
     download_path = os.getenv("VIDEO_DOWNLOAD_PATH", "downloads")
@@ -136,7 +144,8 @@ async def upload_from_id(request: BilibiliUploadRequest, background_tasks: Backg
         if upload_result and isinstance(upload_result, dict):
             final_response = {"status": "success", 
                               "message": "Bilibili video upload finished. Begin finds and uploads SRT subtitles... ...", 
-                              "video_id": video_id
+                              "video_id": video_id,
+                              "chat_id": chat_id
                               }
             final_response.update(upload_result)
             bvid = upload_result.get("bvid")

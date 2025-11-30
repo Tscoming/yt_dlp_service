@@ -25,4 +25,4 @@ EXPOSE 8000
 
 # Run the application
 # Use --host 0.0.0.0 to make it accessible from outside the container
-CMD ["uvicorn", "src.api_gateway.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "src.api_gateway.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

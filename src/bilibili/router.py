@@ -3,8 +3,9 @@ from pydantic import BaseModel
 from typing import List, Optional
 from bilibili_api import video_zone
 import asyncio
+import os
 
-from .uploader import upload
+from .uploader import upload_video, upload_subtitles, call_webhook
 from . import auth
 
 router = APIRouter()
@@ -23,6 +24,20 @@ class BilibiliUploadRequest(BaseModel):
     pages: List[PageMetadata]
     source: Optional[str] = ""
     no_reprint: Optional[int] = 1
+
+async def post_upload_tasks(credential, video_dir: str, bvid: str, upload_data: dict):
+    """
+    Background tasks after video upload: wait for ready, upload subtitles, call webhook.
+    """
+    print(f"Starting post-upload tasks for BVID {bvid}...", flush=True)
+    
+    is_ready = await upload_subtitles(credential, video_dir, bvid)
+    
+    if is_ready:
+        print(f"Video {bvid} is ready. Calling webhook.", flush=True)
+        await call_webhook(upload_data)
+    else:
+        print(f"Video {bvid} did not become ready. Webhook will not be called.", flush=True)
 
 @router.get("/zones")
 def get_zones(format: str = Query("json", description="Output format: 'json' or 'text'")):
@@ -90,24 +105,57 @@ async def upload_from_id(request: BilibiliUploadRequest, background_tasks: Backg
     """
     Receives metadata including a `video_id`, finds the corresponding
     downloaded files, and uploads them to Bilibili.
-
-    The video and cover files are expected to be present in the directory
-    `{VIDEO_DOWNLOAD_PATH}/{video_id}`.
     
-    This endpoint returns immediately and the upload is processed in the background.
+    Step 1: Upload video file. This is a synchronous operation.
+    Step 2: If video upload is successful, the API returns a response.
+    Step 3: Subtitle uploading and other post-processing tasks are run asynchronously in the background.
     """
-    print(f"\n========== STARTING BILIBILI UPLOAD for video_id: {request.video_id} ==========\n", flush=True)
+    video_id = request.video_id
+    data = request.dict()
+    print(f"\n========== STARTING BILIBILI UPLOAD for video_id: {video_id} ==========\n", flush=True)
+
+    download_path = os.getenv("VIDEO_DOWNLOAD_PATH", "downloads")
+    video_dir = os.path.join(download_path, video_id)
+    print(f"Video directory set to: {video_dir}", flush=True)
+
+    if not os.path.isdir(video_dir):
+        print(f"Error: Video directory not found: {video_dir}", flush=True)
+        raise HTTPException(status_code=404, detail=f"Video directory not found: {video_dir}")
+
     try:
-        # Add the upload task to run in the background
-        background_tasks.add_task(upload, request.dict())
-        
-        print(f"\n========== BILIBILI UPLOAD TASK ACCEPTED for video_id: {request.video_id} ==========\n", flush=True)
-        return {
-            "message": "Upload task accepted and is running in the background.",
-            "video_id": request.video_id
-        }
+        credential = await auth.get_credential()
+        print("Successfully got Bilibili credential.", flush=True)
     except Exception as e:
-        # Catch any unexpected errors during task submission
-        print(f"\n========== BILIBILI UPLOAD FAILED for video_id: {request.video_id} with error: {e} ==========\n", flush=True)
-        raise HTTPException(status_code=500, detail=f"An unexpected error occurred while queueing the upload task: {e}")
+        print(f"Failed to get Bilibili credential: {e}", flush=True)
+        raise HTTPException(status_code=500, detail=f"Failed to get Bilibili credential: {e}")
+
+    try:
+        # Step 1: Upload video (synchronous)
+        upload_result = await upload_video(credential, video_dir, data)
+
+        if upload_result and isinstance(upload_result, dict):
+            final_response = {"status": "success", 
+                              "message": "Bilibili video upload finished. Begin finds and uploads SRT subtitles... ...", 
+                              "video_id": video_id
+                              }
+            final_response.update(upload_result)
+            bvid = upload_result.get("bvid")
+
+            if bvid:
+                # Step 2 & 3: Run post-processing in the background
+                print(f"BVID {bvid} received. Creating background task for post-processing.", flush=True)
+                background_tasks.add_task(post_upload_tasks, credential, video_dir, bvid, final_response)
+            else:
+                print("Upload complete, but no BVID received. Cannot start post-processing.", flush=True)
+            
+            print(f"\n========== BILIBILI UPLOAD for video_id: {video_id} COMPLETED ==========\n", flush=True)
+            return final_response
+        else:
+            print("Bilibili upload failed. Check logs for details.", flush=True)
+            raise HTTPException(status_code=500, detail="Bilibili upload failed. Check logs for details.")
+
+    except Exception as e:
+        print(f"\n========== BILIBILI UPLOAD FAILED for video_id: {video_id} with error: {e} ==========\n", flush=True)
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred during the upload process: {e}")
+
 

@@ -36,7 +36,7 @@ def parse_srt_to_bilibili_body(srt_content: str) -> list:
                 })
     return body
 
-async def _call_webhook(data: dict):
+async def call_webhook(data: dict):
     """Calls the n8n webhook with the provided data."""
     
     webhook_url = os.getenv("N8N_WEBHOOK_URL", "https://n8n.homelabtech.cn/webhook-test/b2d8a919-323e-46ea-9d39-80c1d75ca680")
@@ -52,7 +52,7 @@ async def _call_webhook(data: dict):
     except Exception as e:
         print(f"An unexpected error occurred when calling webhook: {e}", flush=True)
 
-async def _upload_subtitles(credential, video_dir: str, bvid: str) -> bool:
+async def upload_subtitles(credential, video_dir: str, bvid: str) -> bool:
     """
     Finds and uploads SRT subtitles for the given BVID. It polls the video status
     to ensure it's ready before proceeding. Returns True if the video is ready, False otherwise.
@@ -147,36 +147,10 @@ async def _upload_subtitles(credential, video_dir: str, bvid: str) -> bool:
 
     return True
 
-async def _post_upload_tasks(credential, video_dir: str, bvid: str, upload_data: dict):
+async def upload_video(credential: Credential, video_dir: str, data: dict):
     """
-    Background tasks after video upload: wait for ready, upload subtitles, call webhook.
+    Uploads a video to Bilibili.
     """
-    print(f"Starting post-upload tasks for BVID {bvid}...", flush=True)
-    
-    is_ready = await _upload_subtitles(credential, video_dir, bvid)
-    
-    if is_ready:
-        print(f"Video {bvid} is ready. Calling webhook.", flush=True)
-        await _call_webhook(upload_data)
-    else:
-        print(f"Video {bvid} did not become ready. Webhook will not be called.", flush=True)
-
-
-async def upload(data: dict):
-    print("Starting Bilibili upload process...", flush=True)
-    video_id = data.get("video_id")
-    if not video_id:
-        return {"status": "error", "message": "video_id is required"}
-    print(f"Processing video with ID: {video_id}", flush=True)
-
-    download_path = os.getenv("VIDEO_DOWNLOAD_PATH", "downloads")
-    video_dir = os.path.join(download_path, video_id)
-    print(f"Video directory set to: {video_dir}", flush=True)
-
-    if not os.path.isdir(video_dir):
-        return {"status": "error", "message": f"Video directory not found: {video_dir}"}
-    print(f"Video directory '{video_dir}' found.", flush=True)
-
     video_files = []
     cover_file = None
     allowed_video_exts = ['.mp4', '.flv', '.avi', '.mkv', '.mov']
@@ -189,35 +163,23 @@ async def upload(data: dict):
             video_files.append(full_path)
         elif not cover_file and ext in allowed_image_exts:
             cover_file = full_path
-    
+
     if not video_files:
-        return {"status": "error", "message": f"No video files found in {video_dir}"}
-    print(f"Found {len(video_files)} video files and cover: {cover_file}", flush=True)
-    
+        raise Exception(f"No video files found in {video_dir}")
+
     pages_meta = data.get("pages", [])
     if len(pages_meta) != len(video_files):
-        return {"status": "error", "message": f"Mismatch between page metadata ({len(pages_meta)}) and video files ({len(video_files)})"}
+        raise Exception(f"Mismatch between page metadata ({len(pages_meta)}) and video files ({len(video_files)})")
 
     pages_data = [{"path": v, "title": p.get("title", f"Part {i+1}"), "description": p.get("description", "")} for i, (v, p) in enumerate(zip(video_files, pages_meta))]
-    print(f"Prepared {len(pages_data)} pages for upload.", flush=True)
 
-    try:
-        credential = await auth.get_credential()
-        print("Successfully got Bilibili credential.", flush=True)
-    except Exception as e:
-        print(f"Failed to get Bilibili credential: {e}", flush=True)
-        return {"status": "error", "message": f"Failed to get Bilibili credential: {e}"}
-
-    print(f"Using Bilibili Credential: SESSDATA={credential.sessdata}, BILI_JCT={credential.bili_jct}, BUVID3={credential.buvid3}", flush=True)
-
- 
     vu_meta = video_uploader.VideoMeta(
         source=data.get("source", ""),
         tid=data.get("tid", 17),
         title=data.get("title", "Untitled"),
         tags=data.get("tags", []),
         desc=data.get("desc", ""),
-        cover=cover_file, 
+        cover=cover_file,
         mission_id=data.get("mission_id"),
         original=data.get("original", False),
         recreate=data.get("recreate", False),
@@ -235,7 +197,6 @@ async def upload(data: dict):
         porder=data.get("porder"),
     )
 
-
     pages = [video_uploader.VideoUploaderPage(path=p['path'], title=p['title'], description=p.get('description', '')) for p in pages_data]
     uploader = video_uploader.VideoUploader(pages, vu_meta, credential)
     upload_result = None
@@ -252,19 +213,6 @@ async def upload(data: dict):
 
     print("Starting Bilibili upload...", flush=True)
     await uploader.start()
-    print("Bilibili upload finished.", flush=True)
+    print("Bilibili upload finished. Waiting for encode and approval ... ...", flush=True)
 
-    if upload_result and isinstance(upload_result, dict):
-        final_response = {"status": "success", "message": "Bilibili upload finished.", "video_id": video_id}
-        final_response.update(upload_result)
-        bvid = upload_result.get("bvid")
-        if bvid:
-            print(f"BVID {bvid} received. Creating background task for post-processing.", flush=True)
-            asyncio.create_task(_post_upload_tasks(credential, video_dir, bvid, final_response))
-            return {"status": "processing", "message": "Upload complete. Post-processing started in background.", "video_id": video_id, "bvid": bvid}
-        else:
-            print("Upload complete, but no BVID received. Cannot start post-processing.", flush=True)
-            return {"status": "error", "message": "Upload complete but no BVID received.", "video_id": video_id}
-    else:
-        return {"status": "error", "message": "Bilibili upload failed. Check logs for details.", "video_id": video_id}
-
+    return upload_result

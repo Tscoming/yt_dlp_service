@@ -91,10 +91,30 @@ class TestBilibiliApi(unittest.TestCase):
         
         print("Test for /zones endpoint PASSED.")
 
+class TestTranslateApi(unittest.TestCase):
+    """Test suite for the Translate API endpoint."""
+
+    BASE_URL = "http://127.0.0.1:9000/api/v1/translate"
+
+    def test_chunks_endpoint_success(self):
+        """Tests the /chunks endpoint."""
+        print("\n--- Testing /chunks endpoint ---")
+        response = requests.post(f"{self.BASE_URL}/chunks", json={}) # Assuming no body is needed for this simple test
+        
+        print(f"Status Code: {response.status_code}")
+        self.assertEqual(response.status_code, 200)
+        
+        data = response.json()
+        self.assertIn("message", data)
+        self.assertEqual(data["message"], "Chunks processed successfully")
+        
+        print("Test for /chunks endpoint PASSED.")
+
 if __name__ == "__main__":
     print("Starting API tests...")
     print(f"Targeting YouTube API at: {TestYtdlpApi.BASE_URL}")
     print(f"Targeting Bilibili API at: {TestBilibiliApi.BASE_URL}")
+    print(f"Targeting Translate API at: {TestTranslateApi.BASE_URL}")
     print(f"Using test video: {TestYtdlpApi.TEST_VIDEO_URL}")
     print("==========================================")
     
@@ -111,6 +131,7 @@ if __name__ == "__main__":
     suite = unittest.TestSuite()
     suite.addTest(unittest.makeSuite(TestYtdlpApi))
     suite.addTest(unittest.makeSuite(TestBilibiliApi))
+    suite.addTest(unittest.makeSuite(TestTranslateApi))
     
     # Run the test suite
     runner = unittest.TextTestRunner()

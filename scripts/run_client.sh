@@ -89,4 +89,5 @@ curl -X POST "http://localhost:9000/api/v1/common/upload" \
 curl -X POST "http://localhost:9000/api/v1/translate/chunks" \
 -H "Content-Type: multipart/form-data" \
 -F "id=123" \
+-F "filename=output_chunks.txt" \
 -F "file=@tests/test_input.txt"

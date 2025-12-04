@@ -18,14 +18,15 @@ class TranslationRequest(BaseModel):
 
 class ChunksResponse(BaseModel):
     id: int = Field(..., description="Translation task ID")
+    filename: str = Field(..., description="Output filename")
     status: str = Field(..., description="Translation status")
     chunks: Optional[list[str]] = Field(default=None, description="Translation result")
     error: Optional[str] = Field(default=None, description="Error message if failed")
 
 @router.post("/chunks", response_model=ChunksResponse)
-async def chunks(id: int = Form(...), file: UploadFile = File(...)):
+async def chunks(id: int = Form(...), filename: str = Form(...), file: UploadFile = File(...)):
     """文本分块API入口"""
-    logging.info(f"收到文本分块请求: ID={id}, 文件名={file.filename}")
+    logging.info(f"收到文本分块请求: ID={id}, 源文件名={file.filename}, 输出文件名={filename}")
     try:  
         source_text = (await file.read()).decode("utf-8")
 
@@ -61,8 +62,9 @@ async def chunks(id: int = Form(...), file: UploadFile = File(...)):
 
 
         return ChunksResponse(
-            id=id,
             status="success",
+            id=id,
+            filename=filename,
             chunks=source_text_chunks
         )
         

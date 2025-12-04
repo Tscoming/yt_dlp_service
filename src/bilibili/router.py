@@ -23,6 +23,7 @@ class BilibiliUploadRequest(BaseModel):
     tags: List[str]
     desc: str
     pages: List[PageMetadata]
+    original: Optional[bool] = False
     source: Optional[str] = ""
     no_reprint: Optional[int] = 1
 

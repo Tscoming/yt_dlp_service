@@ -4,7 +4,7 @@
   "writesubtitles": true,
   "writeautomaticsub": false,
   "writethumbnail": true,
-  "subtitleslangs": ["en", "en-US", "zh-Hans"],
+  "subtitleslangs": ["en", "en-US", "zh", "zh-Hans"],
   "subtitlesformat": "srt",
   "format": "bestvideo[height<=?1080]+bestaudio/best",
   "outtmpl": "~/Downloads/%(title)s.%(ext)s"

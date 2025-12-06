@@ -1,6 +1,8 @@
 
 curl -X POST http://localhost:9000/api/v1/bilibili/login
 
+curl -X GET http://localhost:9000/api/v1/bilibili/zones
+
 # 测试上传bilibili视频完成后的webhook回调
 curl -X POST https://n8n.homelabtech.cn/webhook-test/b2d8a919-323e-46ea-9d39-80c1d75ca680 \
   -H "Content-Type: application/json" \

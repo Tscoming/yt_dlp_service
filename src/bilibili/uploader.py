@@ -2,8 +2,9 @@ import asyncio
 import os
 import re
 import httpx
-from bilibili_api import video, video_uploader, Credential
 from bilibili_api.exceptions import ApiException
+from bilibili_api import video, video_uploader, Credential
+from .robust_uploader import RobustVideoUploader
 from . import auth
 
 def srt_time_to_seconds(time_str: str) -> float:
@@ -149,13 +150,14 @@ async def upload_subtitles(credential, video_dir: str, bvid: str) -> bool:
 
 async def upload_video(credential: Credential, video_dir: str, data: dict):
     """
-    Uploads a video to Bilibili.
+    Uploads a video to Bilibili using RobustVideoUploader.
     """
     video_files = []
     cover_file = None
     allowed_video_exts = ['.mp4', '.flv', '.avi', '.mkv', '.mov']
     allowed_image_exts = ['.jpg', '.jpeg', '.png', '.gif', '.webp']
 
+    # 获取操作系统中的视频文件路径信息
     for f in sorted(os.listdir(video_dir)):
         ext = os.path.splitext(f)[1].lower()
         full_path = os.path.join(video_dir, f)
@@ -164,67 +166,20 @@ async def upload_video(credential: Credential, video_dir: str, data: dict):
         elif not cover_file and ext in allowed_image_exts:
             cover_file = full_path
 
+    print(f"视频文件: {video_files}")
+    print(f"封面文件: {cover_file}")
+
     if not video_files:
-        raise Exception(f"No video files found in {video_dir}")
+        print("没有找到视频文件，跳过上传。")
+        return None
 
-    pages_meta = data.get("pages", [])
-    if len(pages_meta) != len(video_files):
-        raise Exception(f"Mismatch between page metadata ({len(pages_meta)}) and video files ({len(video_files)})")
+    meta = {
+        "tid": data.get("tid", 17),
+        "title": data.get("title", "Untitled"),
+        "tags": data.get("tags", []),
+        "desc": data.get("desc", ""),
+        "cover": cover_file,
+    }
 
-    pages_data = [{"path": v, "title": p.get("title", f"Part {i+1}"), "description": p.get("description", "")} for i, (v, p) in enumerate(zip(video_files, pages_meta))]
-    print(pages_data)
-
-    # vu_meta = video_uploader.VideoMeta(
-    #     source=data.get("source", ""),
-    #     tid=data.get("tid", 17),
-    #     title=data.get("title", "Untitled"),
-    #     tags=data.get("tags", []),
-    #     desc=data.get("desc", ""),
-    #     cover=cover_file,
-    #     mission_id=data.get("mission_id"),
-    #     original=data.get("original", False),
-    #     recreate=data.get("recreate", False),
-    #     no_reprint=data.get("no_reprint", False),
-    #     open_elec=data.get("open_elec", False),
-    #     up_selection_reply=data.get("up_selection_reply", False),
-    #     up_close_danmu=data.get("up_close_danmu", False),
-    #     up_close_reply=data.get("up_close_reply", False),
-    #     lossless_music=data.get("lossless_music", False),
-    #     dolby=data.get("dolby", False),
-    #     subtitle=data.get("subtitle"),
-    #     dynamic=data.get("dynamic"),
-    #     neutral_mark=data.get("neutral_mark"),
-    #     delay_time=data.get("delay_time"),
-    #     porder=data.get("porder"),
-    # )
-
-    vu_meta = video_uploader.VideoMeta( 
-        tid=data.get("tid", 17),
-        title=data.get("title", "Untitled"),
-        tags=data.get("tags", []),
-        desc=data.get("desc", ""),
-        cover=cover_file,
-        no_reprint=True
-    )    
-
-
-
-    pages = [video_uploader.VideoUploaderPage(path=p['path'], title=p['title'], description=p.get('description', '')) for p in pages_data]
-    uploader = video_uploader.VideoUploader(pages, vu_meta, credential)
-    upload_result = None
-
-    @uploader.on("__ALL__")
-    async def ev(event_data):
-        nonlocal upload_result
-        print(f"Bilibili Upload Event: {event_data}", flush=True)
-        if event_data.get("name") in ["PREUPLOAD_FAILED", "FAILED"]:
-            print(f"{event_data['name']} data: {event_data.get('data')}", flush=True)
-        elif event_data.get("name") == "COMPLETE":
-            raw_result = event_data.get("data")
-            upload_result = raw_result[0] if isinstance(raw_result, tuple) and raw_result else raw_result
-
-    print("Starting Bilibili upload...", flush=True)
-    await uploader.start()
-    print("Bilibili upload finished. Waiting for encode and approval ... ...", flush=True)
-
-    return upload_result
+    uploader = RobustVideoUploader(credential)
+    return await uploader.upload(video_files, meta)

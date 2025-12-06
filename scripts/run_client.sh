@@ -19,7 +19,7 @@ curl -X POST \
 
 
 curl -X POST \
-    http://127.0.0.1:9000/api/v1/youtube/download \
+    http://localhost:9000/api/v1/youtube/download \
     -H 'Content-Type: application/json' \
     -d '{ "url": "https://www.youtube.com/watch?v=jNQXAC9IVRw" }' -o file.zip
  
@@ -63,8 +63,8 @@ curl -X POST \
   "title": "上传测试",
   "tags": ["测试", "上传", "脚本"],
   "desc": "这是上传测试视频",
-  "original": false,
-  "source": "TestSource",
+  "original": "True", 
+  "source": "YouTube",
   "pages": [
     {
       "title": "上传测试 - 第1页",

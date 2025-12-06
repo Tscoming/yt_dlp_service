@@ -172,30 +172,42 @@ async def upload_video(credential: Credential, video_dir: str, data: dict):
         raise Exception(f"Mismatch between page metadata ({len(pages_meta)}) and video files ({len(video_files)})")
 
     pages_data = [{"path": v, "title": p.get("title", f"Part {i+1}"), "description": p.get("description", "")} for i, (v, p) in enumerate(zip(video_files, pages_meta))]
+    print(pages_data)
 
-    vu_meta = video_uploader.VideoMeta(
-        source=data.get("source", ""),
+    # vu_meta = video_uploader.VideoMeta(
+    #     source=data.get("source", ""),
+    #     tid=data.get("tid", 17),
+    #     title=data.get("title", "Untitled"),
+    #     tags=data.get("tags", []),
+    #     desc=data.get("desc", ""),
+    #     cover=cover_file,
+    #     mission_id=data.get("mission_id"),
+    #     original=data.get("original", False),
+    #     recreate=data.get("recreate", False),
+    #     no_reprint=data.get("no_reprint", False),
+    #     open_elec=data.get("open_elec", False),
+    #     up_selection_reply=data.get("up_selection_reply", False),
+    #     up_close_danmu=data.get("up_close_danmu", False),
+    #     up_close_reply=data.get("up_close_reply", False),
+    #     lossless_music=data.get("lossless_music", False),
+    #     dolby=data.get("dolby", False),
+    #     subtitle=data.get("subtitle"),
+    #     dynamic=data.get("dynamic"),
+    #     neutral_mark=data.get("neutral_mark"),
+    #     delay_time=data.get("delay_time"),
+    #     porder=data.get("porder"),
+    # )
+
+    vu_meta = video_uploader.VideoMeta( 
         tid=data.get("tid", 17),
         title=data.get("title", "Untitled"),
         tags=data.get("tags", []),
         desc=data.get("desc", ""),
         cover=cover_file,
-        mission_id=data.get("mission_id"),
-        original=data.get("original", False),
-        recreate=data.get("recreate", False),
-        no_reprint=data.get("no_reprint", False),
-        open_elec=data.get("open_elec", False),
-        up_selection_reply=data.get("up_selection_reply", False),
-        up_close_danmu=data.get("up_close_danmu", False),
-        up_close_reply=data.get("up_close_reply", False),
-        lossless_music=data.get("lossless_music", False),
-        dolby=data.get("dolby", False),
-        subtitle=data.get("subtitle"),
-        dynamic=data.get("dynamic"),
-        neutral_mark=data.get("neutral_mark"),
-        delay_time=data.get("delay_time"),
-        porder=data.get("porder"),
-    )
+        no_reprint=True
+    )    
+
+
 
     pages = [video_uploader.VideoUploaderPage(path=p['path'], title=p['title'], description=p.get('description', '')) for p in pages_data]
     uploader = video_uploader.VideoUploader(pages, vu_meta, credential)
